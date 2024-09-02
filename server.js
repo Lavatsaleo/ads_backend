@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const PasswordValidator = require('password-validator'); // Import password-validator
 
 // Load environment variables from .env file
 dotenv.config();
@@ -34,9 +35,29 @@ db.connect((err) => {
     console.log('Connected to MySQL database');
 });
 
+// Create a schema for password validation
+const passwordSchema = new PasswordValidator();
+passwordSchema
+    .is().min(8)                                    // Minimum length 8
+    .is().max(100)                                  // Maximum length 100
+    .has().uppercase()                              // Must have uppercase letters
+    .has().lowercase()                              // Must have lowercase letters
+    .has().digits(2)                                // Must have at least 2 digits
+    .has().not().spaces()                           // Should not have spaces
+    .is().not().oneOf(['Passw0rd', 'Password123']); // Blacklist common passwords
+
 // User registration route
 app.post('/register', (req, res) => {
     const { username, password } = req.body;
+
+    // Validate the password against the schema
+    const passwordValidationResult = passwordSchema.validate(password, { details: true });
+    if (passwordValidationResult.length > 0) {
+        return res.status(400).json({ 
+            message: 'Password does not meet the required criteria', 
+            details: passwordValidationResult 
+        });
+    }
 
     // Check if the username already exists
     const checkUserQuery = 'SELECT * FROM users WHERE username = ?';
